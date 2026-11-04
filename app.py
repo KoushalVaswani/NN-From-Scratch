@@ -7,6 +7,7 @@ from pandas.api.types import is_bool_dtype, is_numeric_dtype
 from sklearn.datasets import load_digits, load_iris, make_circles, make_moons
 from sklearn.model_selection import train_test_split
 
+from metrics import classification_report, confusion_matrix
 from network import predict, train
 from preprocessing import Preprocessor
 
@@ -187,6 +188,18 @@ def draw_network(layer_sizes, activations, W, max_show=10):
     style_fig(fig, 480)
     fig.update_layout(annotations=notes, plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=10, r=10, t=50, b=10),
                       xaxis=dict(visible=False), yaxis=dict(visible=False))
+    return fig
+
+
+def confusion_fig(cm, class_names):
+    """Heatmap of the confusion matrix. Rows = true class, columns = predicted class."""
+    fig = pgo.Figure(pgo.Heatmap(
+        z=cm, x=class_names, y=class_names, colorscale="Blues", showscale=False,
+        text=cm, texttemplate="%{text}", textfont=dict(size=15), hovertemplate="True %{y}, predicted %{x}: %{z}<extra></extra>",
+    ))
+    fig.update_layout(height=max(320, 70 * len(class_names) + 120), margin=dict(l=60, r=20, t=30, b=60),
+                      xaxis=dict(title="Predicted class", type="category", side="bottom"),
+                      yaxis=dict(title="True class", type="category", autorange="reversed"))
     return fig
 
 
@@ -371,14 +384,34 @@ m2.metric("Train accuracy", f"{h['score'][-1]:.4f}")
 m3.metric("Test loss", f"{h['val_loss'][-1]:.4f}")
 m4.metric("Train loss", f"{h['loss'][-1]:.4f}")
 
-tab_curves, tab_net, tab_boundary, tab_weights, tab_try = st.tabs(
-    ["Learning curves", "Network", "Decision boundary", "Weights", "Try it"]
+tab_curves, tab_metrics, tab_net, tab_boundary, tab_weights, tab_try = st.tabs(
+    ["Learning curves", "Metrics", "Network", "Decision boundary", "Weights", "Try it"]
 )
 
 with tab_curves:
     ca, cb = st.columns(2)
     ca.plotly_chart(curve_fig(h["loss"], h["val_loss"], "Loss"), width="stretch", theme=None, config={"displayModeBar": False})
     cb.plotly_chart(curve_fig(h["score"], h["val_score"], "Accuracy"), width="stretch", theme=None, config={"displayModeBar": False})
+
+with tab_metrics:
+    out = predict(run["prep"].transform(run["Xte_df"]), run["W"], run["b"], run["activations"])
+    y_hat = (out[:, 0] > 0.5).astype(int) if run["n_classes"] == 2 else out.argmax(axis=1)
+    cm = confusion_matrix(run["yte"], y_hat, run["n_classes"])
+    rep = classification_report(cm)
+    left, right = st.columns([1, 1])
+    with left:
+        st.caption("Confusion matrix on the test set. Rows are the true class, columns are what the network predicted.")
+        st.plotly_chart(confusion_fig(cm, run["class_names"]), width="stretch", config={"displayModeBar": False})
+    with right:
+        st.caption("Per-class scores on the test set.")
+        table = pd.DataFrame(
+            {"Precision": rep["precision"], "Recall": rep["recall"], "F1": rep["f1"], "Samples": rep["support"]},
+            index=run["class_names"],
+        )
+        table.loc["Macro average"] = [rep["macro"]["precision"], rep["macro"]["recall"], rep["macro"]["f1"], rep["support"].sum()]
+        st.dataframe(table.style.format({"Precision": "{:.3f}", "Recall": "{:.3f}", "F1": "{:.3f}", "Samples": "{:.0f}"}), width="stretch")
+        st.caption("Precision: of the samples predicted as a class, how many were right. "
+                   "Recall: of the samples that truly belong to a class, how many were found.")
 
 with tab_net:
     biggest = max(run["layer_sizes"])
