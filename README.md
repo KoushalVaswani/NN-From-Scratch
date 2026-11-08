@@ -14,11 +14,11 @@ network and look inside it.
 
 The app may take a few seconds to wake up if nobody has opened it for a while.
 
-![App screenshot](screenshots/app.png)
+![App screenshot](APP_SS.png)
 
 | Network diagram | Decision boundary |
 |---|---|
-| ![Network diagram](screenshots/network.png) | ![Decision boundary](screenshots/boundary.png) |
+| ![Network diagram](NETWORK_SS.png) | ![Decision boundary](DECISION_BOUNDARY_SS.png) |
 
 ## What you can do in the app
 1. Choose a dataset (XOR, Moons, Circles, Iris, Digits) or upload your own CSV.
