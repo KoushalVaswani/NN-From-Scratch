@@ -35,12 +35,43 @@ def network_background():
 
 st.markdown(f"""
 <style>
-.stApp {{ background-image: url("data:image/svg+xml;base64,{network_background()}"); background-size: cover; background-position: center; background-attachment: fixed; }}
+/* Faint network drawing behind the header only. It fades out so it never sits behind results. */
+[data-testid="stMainBlockContainer"] {{ position: relative; isolation: isolate; }}
+[data-testid="stMainBlockContainer"]::before {{
+    content: ""; position: absolute; z-index: -1; pointer-events: none;
+    top: -6rem; left: -6rem; right: -6rem; height: 640px;
+    background: url("data:image/svg+xml;base64,{network_background()}") center top / cover no-repeat;
+    -webkit-mask-image: linear-gradient(to bottom, #000 30%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 30%, transparent 100%);
+}}
+.hero h1 {{ font-size: 2.7rem; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 0.3rem 0; padding: 0; }}
+.hero h1 span {{ background: linear-gradient(90deg, #2B59E0, #4F46E5 60%, #0E82C8); -webkit-background-clip: text; background-clip: text; color: transparent; }}
+.hero p {{ font-size: 1.05rem; opacity: 0.8; margin: 0 0 0.9rem 0; max-width: 46rem; }}
+.pills span {{ display: inline-block; margin: 0 0.4rem 0.4rem 0; padding: 0.22rem 0.75rem; border-radius: 999px; font-size: 0.82rem; font-weight: 600;
+    color: #2B59E0; background: rgba(43,89,224,0.10); border: 1px solid rgba(43,89,224,0.28); }}
 [class*="st-key-card_"] {{ border-radius: 14px; backdrop-filter: blur(6px); box-shadow: 0 2px 12px rgba(30,60,160,0.10); }}
 .st-key-card_data  {{ background: linear-gradient(145deg, rgba(43,89,224,0.16), rgba(43,89,224,0.04)); border-color: rgba(43,89,224,0.35); }}
 .st-key-card_arch  {{ background: linear-gradient(145deg, rgba(79,70,229,0.16), rgba(79,70,229,0.04)); border-color: rgba(79,70,229,0.35); }}
 .st-key-card_train {{ background: linear-gradient(145deg, rgba(14,130,200,0.16), rgba(14,130,200,0.04)); border-color: rgba(14,130,200,0.35); }}
 .st-key-card_shape {{ background: linear-gradient(120deg, rgba(43,89,224,0.12), rgba(14,130,200,0.06)); border-color: rgba(43,89,224,0.30); }}
+.flow {{ display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin: 0.6rem 0 0.4rem 0; }}
+.lyr {{ width: 120px; height: 86px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 0.4rem 0.5rem; border-radius: 12px; color: #fff; line-height: 1.2; box-shadow: 0 2px 8px rgba(30,60,160,0.18); }}
+.lyr b {{ display: block; font-size: 1.4rem; }}
+.lyr span {{ display: block; font-size: 0.78rem; opacity: 0.92; }}
+.lyr small {{ display: block; font-size: 0.72rem; opacity: 0.85; font-family: monospace; }}
+.lyr.in {{ background: linear-gradient(135deg, #64748B, #475569); }}
+.lyr.hid {{ background: linear-gradient(135deg, #4F46E5, #2B59E0); }}
+.lyr.out {{ background: linear-gradient(135deg, #0D9488, #0E82C8); }}
+.arrow {{ opacity: 0.5; font-size: 1.2rem; }}
+.legend {{ display: flex; flex-wrap: wrap; gap: 0.3rem 1.2rem; font-size: 0.85rem; opacity: 0.85; margin: 0.2rem 0 0.4rem 0; }}
+.legend .dot {{ display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 50%; margin-right: 0.35rem; }}
+.empty {{ border: 2px dashed rgba(43,89,224,0.35); border-radius: 14px; padding: 1.5rem 1rem; text-align: center; background: rgba(43,89,224,0.04); }}
+.empty > b {{ font-size: 1.15rem; }}
+.steps {{ margin-top: 0.8rem; display: flex; justify-content: center; gap: 0.6rem; flex-wrap: wrap; }}
+.steps span {{ padding: 0.28rem 0.9rem; border-radius: 999px; background: rgba(43,89,224,0.10); font-size: 0.88rem; }}
+.st-key-train button, .st-key-predict button {{ background: linear-gradient(135deg, #2B59E0, #4F46E5); border: 0; color: #fff; font-weight: 600; }}
+.st-key-train button:hover:not(:disabled), .st-key-predict button:hover:not(:disabled) {{ filter: brightness(1.12); color: #fff; }}
+.st-key-results [data-testid="stMetric"] {{ background: linear-gradient(145deg, rgba(43,89,224,0.08), rgba(43,89,224,0.02)); border-radius: 12px; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -54,7 +85,15 @@ DATASET_NOTES = {
     "Iris": "150 flowers, 4 measurements, 3 species.",
     "Digits": "1,797 handwritten digits as 8x8 pixel images, 10 classes.",
 }
-BLUE, AMBER = "#2B59E0", "#E08A1E"
+BLUE, AMBER, RED = "#2B59E0", "#E08A1E", "#E0455B"
+PALETTE = ["#E0455B", "#2B59E0", "#16A34A", "#F59E0B", "#8B5CF6", "#92400E", "#0D9488", "#6B7280", "#84CC16", "#111827"]
+
+
+def pale(hex_colour, amount=0.75):
+    """Mix a colour with white, used for soft decision-boundary regions."""
+    r, g, b = (int(hex_colour[i:i + 2], 16) for i in (1, 3, 5))
+    mix = lambda c: int(c + (255 - c) * amount)
+    return f"rgb({mix(r)},{mix(g)},{mix(b)})"
 
 
 
@@ -140,11 +179,11 @@ def prepare_csv(df, target):
 # ---------------- charts ----------------
 def style_fig(fig, height):
     fig.update_layout(
-        height=height, margin=dict(l=55, r=20, t=55, b=55),
+        height=height, margin=dict(l=55, r=20, t=55, b=55), plot_bgcolor="rgba(0,0,0,0)",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
-    fig.update_xaxes(automargin=True)
-    fig.update_yaxes(automargin=True)
+    fig.update_xaxes(automargin=True, gridcolor="rgba(128,128,128,0.18)", linecolor="rgba(128,128,128,0.35)")
+    fig.update_yaxes(automargin=True, gridcolor="rgba(128,128,128,0.18)", linecolor="rgba(128,128,128,0.35)")
     return fig
 
 
@@ -161,7 +200,7 @@ def curve_fig(train_values, test_values, title):
 
 
 def draw_network(layer_sizes, activations, W, max_show=10):
-    """Neurons as circles, weights as lines: blue = positive, red = negative, thicker = bigger."""
+    """Neurons as circles, weights as lines: blue = positive, red = negative, thicker and darker = bigger."""
     shown = [min(n, max_show) for n in layer_sizes]
     n_layers = len(layer_sizes)
     pos = []
@@ -169,7 +208,7 @@ def draw_network(layer_sizes, activations, W, max_show=10):
         ys = np.linspace(-(n - 1) / 2, (n - 1) / 2, n) if n > 1 else np.array([0.0])
         pos.append((np.full(n, float(l)), ys))
 
-    widths = (0.5, 1.5, 3.0)
+    widths, opacities = (0.6, 1.4, 2.8), (0.18, 0.45, 0.9)      # weak, medium, strong weights
     segs = {(s, k): ([], []) for s in (1, -1) for k in range(3)}
     for l in range(n_layers - 1):
         w = W[l][: shown[l], : shown[l + 1]]
@@ -185,24 +224,56 @@ def draw_network(layer_sizes, activations, W, max_show=10):
     fig = pgo.Figure()
     for (s, k), (xs, ys) in segs.items():
         fig.add_trace(pgo.Scatter(
-            x=xs, y=ys, mode="lines", opacity=0.6, hoverinfo="skip", showlegend=False,
-            line=dict(color="royalblue" if s == 1 else "crimson", width=widths[k]),
+            x=xs, y=ys, mode="lines", opacity=opacities[k], hoverinfo="skip", showlegend=False,
+            line=dict(color=BLUE if s == 1 else RED, width=widths[k]),
         ))
     notes = []
-    top = max(p[1].max() for p in pos) + 0.9          # one common row for all layer labels
+    top = max(p[1].max() for p in pos) + 1.0          # one common row for all layer labels
+    size = 18 if max(shown) <= 8 else 14 if max(shown) <= 20 else 10
     for l in range(n_layers):
+        colour = "#64748B" if l == 0 else "#0D9488" if l == n_layers - 1 else "#4F46E5"
         fig.add_trace(pgo.Scatter(
             x=pos[l][0], y=pos[l][1], mode="markers", hoverinfo="skip", showlegend=False,
-            marker=dict(size=14, color="white", line=dict(color="black", width=1.5)),
+            marker=dict(size=size, color=colour, line=dict(color="white", width=1.5)),
         ))
-        name = "input" if l == 0 else activations[l - 1]
-        extra = f"<br>(first {max_show} shown)" if layer_sizes[l] > max_show else ""
-        unit = "neuron" if layer_sizes[l] == 1 else "neurons"
-        notes.append(dict(x=l, y=top, text=f"{layer_sizes[l]} {unit}<br>{name}{extra}",
-                          showarrow=False, font=dict(size=11)))
+        role = "Input" if l == 0 else "Output" if l == n_layers - 1 else f"Hidden {l}"
+        detail = f"{layer_sizes[l]} {'neuron' if layer_sizes[l] == 1 else 'neurons'}"
+        if l:
+            detail += f" · {activations[l - 1]}"
+        extra = f"<br><i>first {max_show} shown</i>" if layer_sizes[l] > max_show else ""
+        notes.append(dict(x=l, y=top, text=f"<b>{role}</b><br>{detail}{extra}", showarrow=False, font=dict(size=13), yanchor="bottom"))
+    ymin = min(p[1].min() for p in pos)
     style_fig(fig, 480)
-    fig.update_layout(annotations=notes, plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=10, r=10, t=50, b=10),
-                      xaxis=dict(visible=False), yaxis=dict(visible=False))
+    fig.update_layout(annotations=notes, plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=10, r=10, t=10, b=10),
+                      xaxis=dict(visible=False, range=[-0.4, n_layers - 0.6]),
+                      yaxis=dict(visible=False, range=[ymin - 0.8, top + 1.9]))
+    return fig
+
+
+def layer_flow_html(layer_sizes, activations):
+    """One block per layer, joined by arrows. Colours match the network diagram."""
+    n, parts = len(layer_sizes), []
+    for i, size in enumerate(layer_sizes):
+        kind = "in" if i == 0 else "out" if i == n - 1 else "hid"
+        role = "Input" if i == 0 else "Output" if i == n - 1 else f"Hidden {i}"
+        act = "" if i == 0 else f"<small>{activations[i - 1]}</small>"
+        if i:
+            parts.append('<span class="arrow">→</span>')
+        parts.append(f'<div class="lyr {kind}"><b>{size}</b><span>{role}</span>{act}</div>')
+    return '<div class="flow">' + "".join(parts) + "</div>"
+
+
+def weights_fig(Wm, row_labels):
+    """Heatmap of one weight matrix: blue = positive, red = negative, white = near zero."""
+    lim = float(np.abs(Wm).max()) or 1.0
+    fig = pgo.Figure(pgo.Heatmap(
+        z=Wm, x=[f"n{j + 1}" for j in range(Wm.shape[1])], y=[str(r) for r in row_labels], zmin=-lim, zmax=lim,
+        colorscale=[[0, RED], [0.5, "rgb(255,255,255)"], [1, BLUE]], colorbar=dict(thickness=12, title="weight"),
+        hovertemplate="from %{y} to %{x}: %{z:.3f}<extra></extra>",
+    ))
+    fig.update_layout(height=int(min(620, 110 + 22 * Wm.shape[0])), margin=dict(l=110, r=10, t=30, b=10),
+                      xaxis=dict(type="category", side="top"),
+                      yaxis=dict(type="category", autorange="reversed", automargin=True))
     return fig
 
 
@@ -219,42 +290,54 @@ def confusion_fig(cm, class_names):
 
 
 def draw_boundary(run):
-    """Colour map of what the trained network predicts at every point of the 2D plane."""
+    """Soft colour map of what the trained network predicts at every point of the 2D plane."""
     Xtr_df, Xte_df, ytr, yte = run["Xtr_df"], run["Xte_df"], run["ytr"], run["yte"]
     c0, c1 = Xtr_df.columns[0], Xtr_df.columns[1]
     Xall = pd.concat([Xtr_df, Xte_df])
-    gx = np.linspace(Xall[c0].min() - 0.5, Xall[c0].max() + 0.5, 150)
-    gy = np.linspace(Xall[c1].min() - 0.5, Xall[c1].max() + 0.5, 150)
+    pad0, pad1 = 0.05 * (Xall[c0].max() - Xall[c0].min()), 0.05 * (Xall[c1].max() - Xall[c1].min())
+    gx = np.linspace(Xall[c0].min() - pad0, Xall[c0].max() + pad0, 150)
+    gy = np.linspace(Xall[c1].min() - pad1, Xall[c1].max() + pad1, 150)
     xx, yy = np.meshgrid(gx, gy)
     grid = run["prep"].transform(pd.DataFrame({c0: xx.ravel(), c1: yy.ravel()}))
     out = predict(grid, run["W"], run["b"], run["activations"])
-    binary = run["n_classes"] == 2
+    n = run["n_classes"]
+    binary = n == 2
     z = (out[:, 0] if binary else out.argmax(axis=1)).reshape(xx.shape)
 
     fig = pgo.Figure()
-    fig.add_trace(pgo.Contour(
-        x=gx, y=gy, z=z, opacity=0.55, showscale=binary, line_width=0,
-        colorscale="RdBu" if binary else "Viridis",
-        zmin=0 if binary else None, zmax=1 if binary else None,
-        colorbar=dict(title=f"P({run['class_names'][1]})") if binary else None,
-    ))
-    palette = ["crimson", "royalblue", "green", "orange", "purple", "brown", "teal", "gray", "olive", "black"]
-    for c in range(run["n_classes"]):
-        col = palette[c % len(palette)]
+    if binary:
+        scale = [[0, pale(PALETTE[0])], [0.5, "rgb(255,255,255)"], [1, pale(PALETTE[1])]]
+        fig.add_trace(pgo.Contour(x=gx, y=gy, z=z, zmin=0, zmax=1, colorscale=scale, line_width=0, hoverinfo="skip",
+                                  colorbar=dict(title=f"P({run['class_names'][1]})", thickness=12, len=0.8)))
+    else:
+        scale = []
+        for i in range(n):
+            col = pale(PALETTE[i % len(PALETTE)])
+            scale += [[i / n, col], [(i + 1) / n, col]]
+        fig.add_trace(pgo.Heatmap(x=gx, y=gy, z=z, zmin=-0.5, zmax=n - 0.5, colorscale=scale, showscale=False, hoverinfo="skip"))
+    for c in range(n):
+        col = PALETTE[c % len(PALETTE)]
         m = ytr == c
         fig.add_trace(pgo.Scatter(x=Xtr_df[c0][m], y=Xtr_df[c1][m], mode="markers", name=f"{run['class_names'][c]} (train)",
-                                  marker=dict(size=5, color=col, opacity=0.5)))
+                                  marker=dict(size=6, color=col, opacity=0.55)))
         m = yte == c
         fig.add_trace(pgo.Scatter(x=Xte_df[c0][m], y=Xte_df[c1][m], mode="markers", name=f"{run['class_names'][c]} (test)",
-                                  marker=dict(size=8, color=col, symbol="diamond", line=dict(color="black", width=1))))
-    style_fig(fig, 520)
-    fig.update_layout(xaxis_title=str(c0), yaxis_title=str(c1), legend=dict(orientation="v", y=1, x=1.12))
+                                  marker=dict(size=9, color=col, symbol="diamond", line=dict(color="white", width=1.5))))
+    style_fig(fig, 540)
+    fig.update_layout(xaxis_title=str(c0), yaxis_title=str(c1), legend=dict(orientation="h", y=1.1, x=0, xanchor="left"))
+    fig.update_xaxes(showgrid=False, zeroline=False, range=[gx[0], gx[-1]])
+    fig.update_yaxes(showgrid=False, zeroline=False, range=[gy[0], gy[-1]])
     return fig
 
 
 # ---------------- header ----------------
-st.title("Neural network from scratch")
-st.write("Build, train and inspect a neural network written in plain NumPy: forward pass, backpropagation and the Adam optimiser are all hand-coded.")
+st.markdown("""
+<div class="hero">
+<h1>Neural network <span>from scratch</span></h1>
+<p>Build, train and inspect a neural network written in plain NumPy. The forward pass, backpropagation and the Adam optimiser are all hand-coded.</p>
+<div class="pills"><span>NumPy only</span><span>Backpropagation</span><span>Adam optimiser</span><span>Activation per layer</span><span>CSV upload</span></div>
+</div>
+""", unsafe_allow_html=True)
 
 # ---------------- configuration ----------------
 col_data, col_arch, col_train = st.columns([1.05, 1.3, 1], gap="medium")
@@ -274,6 +357,7 @@ with col_data:
         else:
             st.caption(DATASET_NOTES[dataset])
         test_size = st.slider("Test split", 0.1, 0.5, 0.2, 0.05, key="test_size")
+        split_info = st.empty()
 
         if dataset == "Upload CSV":
             if csv_df is None:
@@ -296,6 +380,7 @@ if data_ok:
     # Split first, then fit the preprocessor on the training part only
     Xtr_df, Xte_df, ytr, yte = split_data(X_df, y, test_size)
     prep = Preprocessor().fit(Xtr_df)
+    split_info.caption(f"{len(Xtr_df):,} training samples and {len(Xte_df):,} test samples")
     n_features = prep.n_features_out    # input neurons = columns after encoding
     if n_classes == 2:
         n_out, out_act, loss_name = 1, "sigmoid", "bce"
@@ -342,8 +427,8 @@ with st.container(border=True, key="card_shape"):
     f2.metric("Input neurons", n_features)
     f3.metric("Classes", n_classes)
     f4.metric("Parameters", f"{n_params:,}")
-    st.write("**Layers:** `" + " → ".join(map(str, layer_sizes)) + "`")
-    st.write("**Activations:** `" + " → ".join(activations) + "`  |  **Loss:** `" + loss_name + "`")
+    st.markdown(layer_flow_html(layer_sizes, activations), unsafe_allow_html=True)
+    st.caption(f"Loss function: {loss_name}, chosen automatically from the task.")
     if dataset == "Upload CSV":
         with st.expander("Preprocessing"):
             st.write(f"**Numeric columns ({len(prep.num_cols)}):** missing values → median, then standardised. "
@@ -383,7 +468,9 @@ if go:
 st.subheader("Results")
 run = st.session_state.get("run")
 if run is None:
-    st.info("No model trained yet. Choose the data, architecture and training settings above, then press **Train model**.")
+    st.markdown('<div class="empty"><b>No model trained yet</b><div class="steps">'
+                '<span>1 · Choose a dataset</span><span>2 · Set layers and activations</span>'
+                '<span>3 · Press <b>Train model</b></span></div></div>', unsafe_allow_html=True)
     st.stop()
 
 current = (dataset, tuple(map(str, X_df.columns)), len(X_df))
@@ -393,11 +480,12 @@ if run["signature"] != current or run["layer_sizes"] != layer_sizes or run["acti
 st.caption(f"{run['dataset']}  |  seed {run['seed']}  |  {' → '.join(map(str, run['layer_sizes']))}  |  {', '.join(run['activations'])}")
 
 h = run["h"]
-m1, m2, m3, m4 = st.columns(4)
-m1.metric("Test accuracy", f"{h['val_score'][-1] * 100:.1f}%")
-m2.metric("Train accuracy", f"{h['score'][-1]:.4f}")
-m3.metric("Test loss", f"{h['val_loss'][-1]:.4f}")
-m4.metric("Train loss", f"{h['loss'][-1]:.4f}")
+with st.container(key="results"):
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Test accuracy", f"{h['val_score'][-1] * 100:.1f}%", border=True)
+    m2.metric("Train accuracy", f"{h['score'][-1] * 100:.1f}%", border=True)
+    m3.metric("Test loss", f"{h['val_loss'][-1]:.4f}", border=True)
+    m4.metric("Train loss", f"{h['loss'][-1]:.4f}", border=True)
 
 tab_curves, tab_metrics, tab_net, tab_boundary, tab_weights, tab_try = st.tabs(
     ["Learning curves", "Metrics", "Network", "Decision boundary", "Weights", "Try it"]
@@ -434,7 +522,14 @@ with tab_net:
         max_show = biggest
     else:
         max_show = st.slider("Max neurons shown per layer", 5, min(biggest, 128), min(biggest, 30), key="max_show")
-    st.caption("Blue lines are positive weights, red lines are negative. Thicker means a larger absolute weight.")
+    st.markdown(
+        '<div class="legend">'
+        '<span><span class="dot" style="background:#2B59E0"></span>Positive weight</span>'
+        '<span><span class="dot" style="background:#E0455B"></span>Negative weight</span>'
+        '<span><span class="dot" style="background:#64748B"></span>Input neuron</span>'
+        '<span><span class="dot" style="background:#4F46E5"></span>Hidden neuron</span>'
+        '<span><span class="dot" style="background:#0D9488"></span>Output neuron</span>'
+        '<span>Thicker and darker lines mean larger weights</span></div>', unsafe_allow_html=True)
     st.plotly_chart(
         draw_network(run["layer_sizes"], run["activations"], run["W"], max_show=max_show),
         width="stretch", theme=None, config={"displayModeBar": False},
@@ -448,10 +543,13 @@ with tab_boundary:
         st.info("Decision boundaries are only available for datasets with exactly 2 numeric features (XOR, Moons, Circles).")
 
 with tab_weights:
+    st.caption("Each layer's weight matrix as a heatmap: rows are the inputs to the layer, columns are its neurons. Blue is positive, red is negative, white is close to zero. Exact values are in the table.")
     for i, (W_, b_) in enumerate(zip(run["W"], run["b"]), start=1):
-        with st.expander(f"Layer {i}: W {W_.shape}, b {b_.shape}, activation = {run['activations'][i - 1]}"):
-            st.dataframe(pd.DataFrame(W_, index=run["prep"].feature_names_out if i == 1 else None))
-            st.dataframe(pd.DataFrame(b_, index=["bias"]))
+        labels = run["prep"].feature_names_out if i == 1 else [f"neuron {j + 1}" for j in range(W_.shape[0])]
+        with st.expander(f"Layer {i}: W {W_.shape}, b {b_.shape}, activation = {run['activations'][i - 1]}", expanded=(i == 1)):
+            st.plotly_chart(weights_fig(W_, labels), width="stretch", theme=None, config={"displayModeBar": False})
+            st.dataframe(pd.DataFrame(W_, index=labels), width="stretch")
+            st.dataframe(pd.DataFrame(b_, index=["bias"]), width="stretch")
 
 with tab_try:
     prep_, Xte_df_, yte_ = run["prep"], run["Xte_df"], run["yte"]
@@ -474,7 +572,7 @@ with tab_try:
         x_df = Xte_df_.iloc[[int(idx)]]
         true_label = int(yte_[int(idx)])
 
-    if st.button("Predict", key="predict"):
+    if st.button("Predict", key="predict", type="primary"):
         out = predict(prep_.transform(x_df), run["W"], run["b"], run["activations"])
         if run["n_classes"] == 2:
             p = float(out[0, 0])
