@@ -1,12 +1,3 @@
-"""Preprocessing for the app (uploaded CSV files and the built-in datasets).
-
-A Preprocessor is fitted on the TRAIN split only, then reused on the test split and on values typed
-into the "Try it" tab, so nothing from the test data leaks into training.
-
-  numeric columns      -> missing values filled with the train median, then standardised
-  categorical columns  -> missing values filled with the most frequent train value, then one-hot encoded
-                          (a category never seen in training becomes all zeros)
-"""
 import numpy as np
 import pandas as pd
 from pandas.api.types import is_bool_dtype, is_numeric_dtype
