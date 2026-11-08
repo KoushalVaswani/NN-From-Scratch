@@ -8,9 +8,9 @@ network and look inside it.
 
 ## Live demo
 
-[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://YOUR-APP-NAME.streamlit.app)
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://nn-from-scratch.streamlit.app/)
 
-**Try it here: https://YOUR-APP-NAME.streamlit.app**
+**Try it here: https://nn-from-scratch.streamlit.app/**
 
 The app may take a few seconds to wake up if nobody has opened it for a while.
 
