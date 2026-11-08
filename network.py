@@ -78,14 +78,6 @@ def backward(y, W, activations, Z, A, loss_name):
             dZ = dA * DERIVATIVES[activations[l - 1]](Z[l - 1], A[l])
     return dW, db
 
-rng = np.random.default_rng(1)
-X = rng.normal(size=(6, 4))
-y = np.eye(3)[rng.integers(0, 3, 6)]
-acts = ["relu", "tanh", "softmax"]
-W, b = init_params([4, 5, 4, 3], acts, seed=1)
-out, Z, A = forward(X, W, b, acts)
-dW, db = backward(y, W, acts, Z, A, "cce")
-
 def init_adam(W, b):
     return {
         "mW": [np.zeros_like(w) for w in W],
@@ -135,7 +127,7 @@ def train(X, y, layer_sizes, activations, loss_name, epochs=100, batch_size=32,
     batch_size = min(batch_size, m)
 
     for epoch in range(epochs):
-        idx = rng.permutation(m)                      # har epoch mein data shuffle
+        idx = rng.permutation(m)                      # reshuffle the data every epoch
         for start in range(0, m, batch_size):
             batch = idx[start:start + batch_size]
             out, Z, A = forward(X[batch], W, b, activations)
@@ -150,4 +142,3 @@ def train(X, y, layer_sizes, activations, loss_name, epochs=100, batch_size=32,
             history["val_loss"].append(LOSSES[loss_name](v_pred, y_val))
             history["val_score"].append(score(v_pred, y_val, loss_name))
     return W, b, history
-

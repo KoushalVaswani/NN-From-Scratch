@@ -7,7 +7,8 @@ def relu_derivative(x):
     return np.where(x > 0, 1, 0)
 
 def sigmoid(x):
-    return 1/(1 + np.exp(-x))
+    x = np.clip(x, -500, 500)      # avoids overflow in exp for very negative inputs
+    return 1 / (1 + np.exp(-x))
 
 def sigmoid_derivative(x):
     return x * (1 - x)
@@ -34,4 +35,3 @@ def softmax(z):
     z = z - np.max(z, axis=1, keepdims=True) 
     e = np.exp(z)
     return e / np.sum(e, axis=1, keepdims=True)
-

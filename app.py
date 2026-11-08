@@ -1,4 +1,5 @@
 import base64
+import io
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as pgo
@@ -57,10 +58,24 @@ BLUE, AMBER = "#2B59E0", "#E08A1E"
 
 
 
+@st.cache_data
+def read_csv(raw):
+    return pd.read_csv(io.BytesIO(raw))
+
+
+def split_data(X_df, y, test_size):
+    """Train/test split. Keeps the class proportions equal in both parts when that is possible."""
+    try:
+        return train_test_split(X_df, y, test_size=test_size, random_state=42, stratify=y)
+    except ValueError:      # a class has too few samples to stratify
+        return train_test_split(X_df, y, test_size=test_size, random_state=42)
+
+
 class DataError(Exception):
     """Raised when an uploaded CSV cannot be used. The message is shown to the user."""
 
 
+@st.cache_data
 def load_data(name):
     if name == "XOR":
         rng = np.random.default_rng(0)
@@ -254,7 +269,7 @@ with col_data:
         if dataset == "Upload CSV":
             csv_file = st.file_uploader("CSV file", type="csv", key="csv_file")
             if csv_file is not None:
-                csv_df = pd.read_csv(csv_file)
+                csv_df = read_csv(csv_file.getvalue())
                 target_col = st.selectbox("Column to predict", csv_df.columns, index=len(csv_df.columns) - 1, key="target_col")
         else:
             st.caption(DATASET_NOTES[dataset])
@@ -279,7 +294,7 @@ with col_data:
 if data_ok:
     n_classes = len(np.unique(y))
     # Split first, then fit the preprocessor on the training part only
-    Xtr_df, Xte_df, ytr, yte = train_test_split(X_df, y, test_size=test_size, random_state=42)
+    Xtr_df, Xte_df, ytr, yte = split_data(X_df, y, test_size)
     prep = Preprocessor().fit(Xtr_df)
     n_features = prep.n_features_out    # input neurons = columns after encoding
     if n_classes == 2:
